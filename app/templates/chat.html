@@ -1,47 +1,145 @@
 <html>
-    <head>
-        <title>Private Chatter: {{ room }}</title>
-        <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
-        <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
-        <script type="text/javascript" charset="utf-8">
-            var room = '{{ room }}';
-            var socket;
-            $(document).ready(function(){
-                socket = io.connect('http://' + document.domain + ':' + location.port + '/chat');
-                socket.on('connect', function() {
-                    socket.emit('joined', {room: room});
-                });
-                socket.on('status', function(data) {
-                    $('#chat').val($('#chat').val() + '<' + data.msg + '>\n');
-                    $('#chat').scrollTop($('#chat')[0].scrollHeight);
-                });
-                socket.on('message', function(data) {
-                    $('#chat').val($('#chat').val() + data.msg + '\n');
-                    $('#chat').scrollTop($('#chat')[0].scrollHeight);
-                });
-                $('#text').keypress(function(e) {
-                    var code = e.keyCode || e.which;
-                    if (code == 13) {
-                        text = $('#text').val();
-                        $('#text').val('');
-                        socket.emit('text', {msg: text, room: room});
-                    }
-                });
-            });
-            function logout() {
-                socket.emit('left', {}, function() {
-                    socket.disconnect();
+<head>
+  <title>Private Chatter: {{ room }}</title>
+  <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+  <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
+  <script type="text/javascript" src="/static/cryptico/cryptico.js"></script>
 
-                    // go back to the login page
-                    window.location.href = "{{ url_for('main.logout') }}";
+</head>
+<body>
+<h1>Private Chatter: {{ room }}</h1>
+<button id="copy-pubkey">Copy PublicKey</button>
+<div id="pubkey" style="height: 3em; word-wrap: break-word; "></div>
+<br>
+<textarea id="chat" cols="80" rows="20"></textarea><br><br>
+<input id="text" size="80" placeholder="Enter your message here"><br><br>
+<h2>Endpoint's public key</h2>
+<textarea id="pubkeys" cols="80" rows="20"></textarea><br><br>
+<a href="#" onclick="logout();">Logout</a>
+<script type="text/javascript" charset="utf-8">
+    const room = '{{ room }}';
+
+    var socket;
+
+    function utf8_to_b64(str) {
+        return window.btoa(encodeURIComponent(escape(str)));
+    }
+
+    function b64_to_utf8(str) {
+        return unescape(decodeURIComponent(window.atob(str)));
+    }
+
+    function try_decode(msg) {
+        for (let i = 0; i < msg.messages.length; i++) {
+            const result = cryptico.decrypt(msg.messages[i].data, rsaKey);
+            {#console.log(result);#}
+            if (result.status === 'success' && result.signature === "verified") {
+                const text = b64_to_utf8(result.plaintext);
+                return text;
+
+            }
+        }
+
+        return '<could not decrypt>';
+    }
+
+    function isBlank(str) {
+        return (!str || /^\s*$/.test(str));
+    }
+
+    function serializeRSAKey(key) {
+        return JSON.stringify({
+            coeff: key.coeff.toString(16),
+            d: key.d.toString(16),
+            dmp1: key.dmp1.toString(16),
+            dmq1: key.dmq1.toString(16),
+            e: key.e.toString(16),
+            n: key.n.toString(16),
+            p: key.p.toString(16),
+            q: key.q.toString(16)
+        })
+    }
+
+    function deserializeRSAKey(key) {
+        let json = JSON.parse(key);
+        let rsa = new RSAKey();
+        rsa.setPrivateEx(json.n, json.e, json.d, json.p, json.q, json.dmp1, json.dmq1, json.coeff);
+        return rsa;
+    }
+
+    $(document).ready(function () {
+        window.rsaKey = window.localStorage.getItem("rsaKey");
+        if (window.rsaKey === null) {
+            const passphrase = "some pass phrase" + Date.now();
+            window.rsaKey = cryptico.generateRSAKey(passphrase, 512);
+            const json = serializeRSAKey(window.rsaKey);
+            window.localStorage.setItem("rsaKey", json);
+        } else {
+            window.rsaKey = deserializeRSAKey(window.rsaKey);
+        }
+        $("#pubkey").text(cryptico.publicKeyString(rsaKey));
+        $("#copy-pubkey").click(function () {
+            var text = $("#pubkey").text();
+            navigator.clipboard.writeText(text).then(function () {
+                console.log('Async: Copying to clipboard was successful!');
+            }, function (err) {
+                console.error('Async: Could not copy text: ', err);
+            });
+        });
+
+        socket = io.connect('http://' + document.domain + ':' + location.port + '/chat');
+        socket.on('connect', function () {
+            socket.emit('joined', {room: room});
+        });
+        socket.on('status', function (data) {
+            $('#chat').val($('#chat').val() + '<' + data.msg + '>\n');
+            $('#chat').scrollTop($('#chat')[0].scrollHeight);
+        });
+        socket.on('message', function (data) {
+            $('#chat').val($('#chat').val() + data.sender + ":" + try_decode(data) + '\n');
+            $('#chat').scrollTop($('#chat')[0].scrollHeight);
+        });
+
+        $('#text').keypress(function (e) {
+            var code = e.keyCode || e.which;
+            if (code == 13) {
+                const text = $('#text').val();
+                $('#text').val('');
+                const pub_keys = $("#pubkeys").val().split("\n");
+                pub_keys.push(cryptico.publicKeyString(rsaKey));
+                const messages = [];
+                for (let i = 0; i < pub_keys.length; i++) {
+                    if (!isBlank(pub_keys[i])) {
+                        const msg = {
+                            data: cryptico.encrypt(utf8_to_b64(text), pub_keys[i], rsaKey).cipher,
+                        };
+                        {#console.log(msg);#}
+                        messages.push(msg);
+                    }
+                }
+                socket.emit('text', {
+                    messages: messages,
+                    room: room
                 });
             }
-        </script>
-    </head>
-    <body>
-        <h1>Private Chatter: {{ room }}</h1>
-        <textarea id="chat" cols="80" rows="20"></textarea><br><br>
-        <input id="text" size="80" placeholder="Enter your message here"><br><br>
-        <a href="#" onclick="logout();">Logout</a>
-    </body>
+        });
+        const pubkeys = window.localStorage.getItem("pubkeys");
+        if (pubkeys !== null) {
+            $('#pubkeys').val(pubkeys);
+        }
+        $('#pubkeys').bind('input propertychange', function () {
+            window.localStorage.setItem("pubkeys", $('#pubkeys').val());
+        });
+    });
+
+    function logout() {
+        socket.emit('left', {}, function () {
+            socket.disconnect();
+            window.localStorage.clear();
+            // go back to the login page
+            window.location.href = "{{ url_for('main.logout') }}";
+        });
+    }
+</script>
+</body>
 </html>

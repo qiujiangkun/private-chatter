@@ -1,0 +1,3 @@
+[submodule "app/static/cryptico"]
+	path = app/static/cryptico
+	url = https://github.com/wwwtyro/cryptico
