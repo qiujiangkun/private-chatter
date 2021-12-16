@@ -1,8 +1,15 @@
-Flask-SocketIO-Chat
+Private Chatter
 ===================
 
-A simple chat application that demonstrates how to structure a Flask-SocketIO application.
+Private Chatter aims to provide an easy-to-use and easy-to-deploy, end-to-end encrypted anonymous chat service.
 
-To run this application install the requirements in a virtual environment, run `python chat.py` and visit `http://localhost:5000` on one or more browser tabs.
 
-    $ python chat.py
+## How to run
+```shell
+python3 chat.py
+```
+
+## Features
+- [ ] No registration
+- [ ] RSA based
+- [ ] No raw text passed to server
