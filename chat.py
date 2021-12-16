@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python3
 from app import create_app, socketio
 
 app = create_app(debug=True)

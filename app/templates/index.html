@@ -1,14 +1,40 @@
 <html>
-    <head>
-        <title>Flask-SocketIO-Chat</title>
-    </head>
-    <body>
-        <h1>Flask-SocketIO-Chat</h1>
-        <form method="POST">
-            {{ form.hidden_tag() }}
-            {{ form.name.label }}: {{ form.name() }} {% for error in form.name.errors %}{{ error }}{% endfor %}<br>
-            {{ form.room.label }}: {{ form.room() }} {% for error in form.room.errors %}{{ error }}{% endfor %}<br>
-            {{ form.submit() }}
-        </form>
-    </body>
+<head>
+  <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+
+  <title>Private Chatter</title>
+</head>
+<body>
+<h1>Private Chatter</h1>
+<form method="POST">
+  {{ form.hidden_tag() }}
+  {{ form.name.label }}: {{ form.name() }} {% for error in form.name.errors %}{{ error }}{% endfor %}
+  <button id="random-name" type="button">Random</button>
+
+  <br>
+  {{ form.room.label }}: {{ form.room() }} {% for error in form.room.errors %}{{ error }}{% endfor %}
+  <button id="random-room" type="button">Random</button>
+  <br>
+  {{ form.submit() }}
+</form>
+<script>
+    function makeid(length) {
+        var result = '';
+        var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        var charactersLength = characters.length;
+        for (var i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() *
+                charactersLength));
+        }
+        return result;
+    }
+
+    $("#random-name").click(function () {
+        $("#name").val(makeid(6));
+    });
+    $("#random-room").click(function () {
+        $("#room").val(makeid(16));
+    });
+</script>
+</body>
 </html>

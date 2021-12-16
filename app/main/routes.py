@@ -1,6 +1,7 @@
 from flask import session, redirect, url_for, render_template, request
 from . import main
 from .forms import LoginForm
+import random
 
 
 @main.route('/', methods=['GET', 'POST'])
@@ -9,20 +10,23 @@ def index():
     form = LoginForm()
     if form.validate_on_submit():
         session['name'] = form.name.data
-        session['room'] = form.room.data
-        return redirect(url_for('.chat'))
+        room = form.room.data
+        return redirect(url_for('.chat', room=room))
     elif request.method == 'GET':
         form.name.data = session.get('name', '')
-        form.room.data = session.get('room', '')
+        form.room.data = request.args.get('room', '')
     return render_template('index.html', form=form)
 
 
-@main.route('/chat')
-def chat():
-    """Chat room. The user's name and room must be stored in
-    the session."""
+@main.route('/chat/<room>')
+def chat(room):
     name = session.get('name', '')
-    room = session.get('room', '')
     if name == '' or room == '':
-        return redirect(url_for('.index'))
+        return redirect(url_for('.index', room=room))
     return render_template('chat.html', name=name, room=room)
+
+
+@main.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('.index'))
