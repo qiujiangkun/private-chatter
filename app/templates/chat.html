@@ -15,6 +15,9 @@
 <input id="text" size="80" placeholder="Enter your message here"><br><br>
 <h2>Endpoint's public key</h2>
 <textarea id="pubkeys" cols="80" rows="20"></textarea><br><br>
+<h3>Online Users</h3>
+<textarea id="online-users" cols="80" rows="10"></textarea><br><br>
+
 <a href="#" onclick="logout();">Logout</a>
 <script type="text/javascript" charset="utf-8">
     const room = '{{ room }}';
@@ -89,11 +92,20 @@
 
         socket = io.connect('http://' + document.domain + ':' + location.port + '/chat');
         socket.on('connect', function () {
-            socket.emit('joined', {room: room});
+            socket.emit('joined', {room: room, pubkey: cryptico.publicKeyString(rsaKey)});
         });
         socket.on('status', function (data) {
-            $('#chat').val($('#chat').val() + '<' + data.msg + '>\n');
-            $('#chat').scrollTop($('#chat')[0].scrollHeight);
+            if (data.type !== 'list') {
+              $('#chat').val($('#chat').val() + '<' + data.msg + '>\n');
+              $('#chat').scrollTop($('#chat')[0].scrollHeight);
+              socket.emit('online_users');
+            } else {
+                var text = "";
+                for (let i = 0; i < data.users.length; i++) {
+                    text += data.users[i].user + " " + data.users[i].pubkey + "\n";
+                }
+              $('#online-users').val(text);
+            }
         });
         socket.on('message', function (data) {
             $('#chat').val($('#chat').val() + data.sender + ":" + try_decode(data) + '\n');
@@ -119,7 +131,6 @@
                 }
                 socket.emit('text', {
                     messages: messages,
-                    room: room
                 });
             }
         });
